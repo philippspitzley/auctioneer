@@ -1,0 +1,13 @@
+[project]
+name = "auctioneer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.14.1",
+    "fastapi[standard]>=0.115.7",
+    "psycopg2>=2.9.10",
+    "python-dotenv>=1.0.1",
+    "sqlmodel>=0.0.22",
+]
