@@ -7,7 +7,9 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.14.1",
     "fastapi[standard]>=0.115.7",
+    "passlib[bcrypt]>=1.7.4",
     "psycopg2>=2.9.10",
+    "pyjwt>=2.10.1",
     "python-dotenv>=1.0.1",
     "sqlmodel>=0.0.22",
 ]
