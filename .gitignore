@@ -11,3 +11,6 @@ wheels/
 
 # env
 .env
+
+# dummy data for testing
+dummy_data.py
