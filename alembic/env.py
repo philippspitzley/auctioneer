@@ -3,8 +3,14 @@ from logging.config import fileConfig
 from config import DB_URI
 
 from alembic import context
-# from dotenv import load_dotenv
-from app.models import User  # add all your models that are tables  # noqa: F401
+
+# add all models that are tables
+from app.db_models import (
+    User,  # noqa: F401
+    Auction,  # noqa: F401
+    Product,  # noqa: F401
+    Category,  # noqa: F401
+)
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel  # added
 
