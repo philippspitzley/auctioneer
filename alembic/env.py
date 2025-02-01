@@ -5,7 +5,7 @@ from config import DB_URI
 from alembic import context
 
 # add all models that are tables
-from app.db_models import (
+from app.models import (
     User,  # noqa: F401
     Auction,  # noqa: F401
     Product,  # noqa: F401
