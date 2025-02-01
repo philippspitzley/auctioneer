@@ -1,12 +1,11 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from .routers import users
 
 from .db import create_db_and_tables
+from .routers import users
 
 # from .dependencies import get_query_token, get_token_header
-# from .internal import admin
 # from .routers import auctions, users
 
 
