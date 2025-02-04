@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .db import create_db_and_tables
-from .routers import users
+from .routers import auth, users
 
 # from .dependencies import get_query_token, get_token_header
 # from .routers import auctions, users
@@ -39,14 +39,7 @@ app = FastAPI(
 
 
 app.include_router(users.router)
-# app.include_router(auctions.router)
-# app.include_router(
-#     admin.router,
-#     prefix="/admin",
-#     tags=["admin"],
-#     dependencies=[Depends(get_token_header)],
-#     responses={418: {"description": "I'm a teapot"}},
-# )
+app.include_router(auth.router)
 
 
 @app.get("/")
