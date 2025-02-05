@@ -5,9 +5,8 @@ from datetime import datetime
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
-from ..utils.helper import get_current_timestamp
-
 # TODO: generate UUI
+# TODO: CRUD pydantic classes
 
 
 class Product(SQLModel, table=True):
@@ -28,8 +27,8 @@ class Product(SQLModel, table=True):
     # )
 
 
-class ProductCreate(Product):
-    created_at: datetime = Field(default_factory=get_current_timestamp)
+# class ProductCreate(Product):
+#     created_at: datetime = Field(default_factory=get_current_timestamp)
 
 
 class Category(SQLModel, table=True):
