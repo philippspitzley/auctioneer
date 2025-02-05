@@ -27,7 +27,7 @@ class UserPublic(UserBase):
 class User(UserPublic, table=True):
     password_hash: str
     created_at: datetime = Field(default_factory=get_current_timestamp)
-    updated_at: datetime = Field(default=None)
+    updated_at: datetime | None = Field(default=None)
 
 
 class UserMe(UserBase):
