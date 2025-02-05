@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import select
+from ..db_handler import delete_object
 
 from ..dependencies import AdminRequired, SessionDep, UserRequired
 from ..models.user_model import (
@@ -23,7 +24,7 @@ router = APIRouter(
 
 
 @router.post("/", dependencies=[AdminRequired])
-def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
+async def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     """
     ## Create a new user
 
@@ -44,7 +45,6 @@ def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     * `HTTPException`: If the user already exists.
     """
     hashed_password = get_password_hash(user.password)
-    print(hashed_password)
     del user.password
     db_user = User(**user.model_dump(), password_hash=hashed_password)
     session.add(db_user)
@@ -55,7 +55,7 @@ def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
 
 
 @router.get("/", dependencies=[UserRequired])
-def read_users(
+async def read_users(
     session: SessionDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(le=100)] = 10,
@@ -89,7 +89,7 @@ def read_users(
 
 
 @router.get("/{user_id}", dependencies=[UserRequired])
-def read_user(user_id: int, session: SessionDep) -> UserPublic:
+async def read_user(user_id: int, session: SessionDep) -> UserPublic:
     """
     ## Retrieve a user by ID
 
@@ -238,11 +238,8 @@ def delete_user(user_id: int, session: SessionDep):
 
     * `HTTPException`: If the user is not found.
     """
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    session.delete(user)
-    session.commit()
+    delete_object(user_id, User, session)
+
     return {"ok": True}
 
 
