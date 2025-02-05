@@ -17,6 +17,23 @@ class State(str, Enum):
     finished = "finished"
 
 
+class AuctionFilter(str, Enum):
+    id = "id"
+    owner_id = "owner_id"
+    product_id = "product_id"
+    state = "state"
+    start_time = "start_time"
+    end_time = "end_time"
+    starting_price = "starting_price"
+    min_bid = "min_bid"
+    instant_buy_price = "instant_buy_price"
+    buyer_id = "buyer_id"
+    sold = "sold"
+    sold_price = "sold_price"
+    created_at = "created_at"
+    updated_at = "updated_at"
+
+
 class AuctionBase(SQLModel):
     owner_id: int = Field(foreign_key="user.id", ondelete="SET NULL")
     state: State = Field(default=State.setup)
@@ -38,7 +55,9 @@ class AuctionPublic(AuctionBase):
 class Auction(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     owner_id: int = Field(foreign_key="user.id")
-    product_id: int = Field(foreign_key="product.id")
+    product_id: int | None = Field(
+        foreign_key="product.id", ondelete="SET NULL"
+    )
     state: State = Field(default=State.setup)
     start_time: datetime | None = Field(default=None)
     end_time: datetime | None = Field(default=None)
