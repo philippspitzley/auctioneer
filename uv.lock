@@ -43,6 +43,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "colorama" },
     { name = "fastapi", extra = ["standard"] },
     { name = "passlib", extra = ["bcrypt"] },
     { name = "psycopg2" },
@@ -54,6 +55,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.14.1" },
+    { name = "colorama", specifier = ">=0.4.6" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.7" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "psycopg2", specifier = ">=2.9.10" },
