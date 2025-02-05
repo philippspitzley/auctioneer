@@ -8,10 +8,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
-from sqlmodel import Session, select
+# from sqlmodel import Session, select
 
-from ..db import engine
+# from ..db import engine
 from ..models.user_model import User
+from ..db_handler import get_user
 
 # TODO: implement database handling
 
@@ -50,10 +51,10 @@ def verify_password(plain_password, hashed_password):
     )
 
 
-def get_user(username: str | None = None) -> User | None:
-    with Session(engine) as session:
-        user = session.exec(select(User).where(User.email == username)).first()
-        return user
+# def get_user(username: str | None = None) -> User | None:
+#     with Session(engine) as session:
+#         user = session.exec(select(User).where(User.email == username)).first()
+#         return user
 
 
 def authenticate_user(username: str, password: str):
