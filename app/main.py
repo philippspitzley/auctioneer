@@ -2,18 +2,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .db import create_db_and_tables
-from .routers import auth, users
-
-# from .dependencies import get_query_token, get_token_header
-# from .routers import auctions, users
+from .routers import auctions, auth, products, users
+# from .create_admin import create_admin_user
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_db_and_tables()
+    # create_admin_user()
     yield
-    print("Shutdown")
 
 
 app = FastAPI(
@@ -40,6 +36,8 @@ app = FastAPI(
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(auctions.router)
+app.include_router(products.router)
 
 
 @app.get("/")
