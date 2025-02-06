@@ -3,16 +3,17 @@ from typing import Annotated
 
 import bcrypt
 import jwt
-from config import ALGORITHM, SECRET_KEY
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
-# from sqlmodel import Session, select
 
+from ..config import ALGORITHM, SECRET_KEY
+from ..db_handler import get_user
+
+# from sqlmodel import Session, select
 # from ..db import engine
 from ..models.user_model import User
-from ..db_handler import get_user
 
 # TODO: implement database handling
 

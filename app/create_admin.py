@@ -1,8 +1,9 @@
 from sqlmodel import Session
+
+from .config import ADMIN_PASSWORD, ADMIN_USERNAME
 from .db_handler import engine
+from .models.user_model import Role, User, UserCreate
 from .utils.auth import get_password_hash
-from .models.user_model import User, UserCreate, Role
-from config import ADMIN_PASSWORD, ADMIN_USERNAME
 
 
 def create_admin_user():

@@ -1,10 +1,10 @@
 from datetime import timedelta
 from typing import Annotated
 
-from config import ACCESS_TOKEN_EXPIRE_MINUTES
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
 from ..models.user_model import UserCreate
 from ..utils.auth import Token, authenticate_user, create_access_token

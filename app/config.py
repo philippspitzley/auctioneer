@@ -1,9 +1,7 @@
 import os
-import warnings
-from colorama import Back, Style, Fore
 
+from colorama import Back, Fore, Style
 from dotenv import load_dotenv
-
 
 load_dotenv()
 
