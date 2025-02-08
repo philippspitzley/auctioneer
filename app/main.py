@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 
 from .routers import auctions, auth, products, users
+
 # from .create_admin import create_admin_user
 
 
@@ -17,20 +19,9 @@ app = FastAPI(
     title="Auctioneer API",
     summary="like on the bazar",
     description="""
-                ChimichangApp API helps you do awesome stuff. 🚀
-
-                ## Items
-
-                You can **read items**.
-
-                ## Users
-
-                You will be able to:
-
-                * **Create users** (_not implemented_).
-                * **Read users** (_not implemented_).
-
-                """,
+# Welcome to the Auctioneer API! 🚀
+#### This API allows you to manage auctions, users, and products.
+""",
 )
 
 
@@ -40,6 +31,6 @@ app.include_router(auctions.router)
 app.include_router(products.router)
 
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+@app.get("/", response_class=RedirectResponse)
+async def root(request: Request):
+    return RedirectResponse(request.url_for("swagger_ui_html"))
