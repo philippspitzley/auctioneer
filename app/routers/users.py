@@ -1,10 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlmodel import select
-from ..db_handler import delete_object
 
+import app.db_handler as db
+import app.utils as utils
+
+from ..db_handler import delete_object
 from ..dependencies import AdminRequired, SessionDep, UserRequired
+from ..models.filter_model import UserFilter
 from ..models.user_model import (
     Role,
     SetUserPermission,
@@ -14,8 +17,6 @@ from ..models.user_model import (
     UserPublic,
     UserUpdate,
 )
-from ..utils.auth import get_password_hash
-from ..utils.helper import get_current_timestamp
 
 router = APIRouter(
     prefix="/users",
@@ -44,14 +45,11 @@ async def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
 
     * `HTTPException`: If the user already exists.
     """
-    hashed_password = get_password_hash(user.password)
+    hashed_password = utils.get_password_hash(user.password)
     del user.password
     db_user = User(**user.model_dump(), password_hash=hashed_password)
-    session.add(db_user)
-    session.commit()
-    session.refresh(db_user)
-    public_user = UserPublic.model_validate(db_user)
-    return public_user
+    db.add_object(db_user, session)
+    return UserPublic.model_validate(db_user)
 
 
 @router.get("/", dependencies=[UserRequired])
@@ -59,6 +57,8 @@ async def read_users(
     session: SessionDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(le=100)] = 10,
+    order_by: UserFilter = UserFilter.USERNAME,
+    reverse: bool = False,
 ) -> list[UserPublic]:
     """
     ## Retrieve a list of users
@@ -81,8 +81,18 @@ async def read_users(
 
     * `HTTPException`: If the query fails.
     """
-    stmt = select(User).offset(offset).limit(limit).order_by(User.username)
-    users = session.exec(stmt).all()
+    # stmt = select(User).offset(offset).limit(limit).order_by(order_by)
+    # users = session.exec(stmt).all()
+
+    users = db.read_objects(
+        User,
+        session,
+        offset=offset,
+        limit=limit,
+        order_by=order_by,
+        reverse=reverse,
+    )
+
     public_users = [UserPublic.model_validate(user) for user in users]
 
     return public_users
@@ -109,7 +119,8 @@ async def read_user(user_id: int, session: SessionDep) -> UserPublic:
 
     * `HTTPException`: If the user is not found.
     """
-    user = session.get(User, user_id)
+    # user = session.get(User, user_id)
+    user = db.read_object(User, session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     public_user = UserPublic.model_validate(user)
@@ -165,6 +176,7 @@ async def update_user_me(
 
     * `HTTPException`: If the user is not found.
     """
+    # should not happen because is already checked in UserRequired
     if not current_user.id:
         raise HTTPException(status_code=400, detail="User ID not found")
 
@@ -198,23 +210,9 @@ def update_user(
 
     * `HTTPException`: If the user is not found.
     """
-    user_db = session.get(User, user_id)
-    if not user_db:
-        raise HTTPException(status_code=404, detail="User not found")
 
-    user_data = update_data.model_dump(exclude_unset=True)
-
-    user_data["updated_at"] = get_current_timestamp()
-
-    if update_data.password:
-        hashed_password = get_password_hash(update_data.password)
-        user_data["password_hash"] = hashed_password
-
-    user_db.sqlmodel_update(user_data)
-    session.add(user_db)
-    session.commit()
-    session.refresh(user_db)
-    return user_db
+    user_db = db.update_object(user_id, User, update_data, session)
+    return user_db  # type: ignore
 
 
 @router.delete("/{user_id}", dependencies=[AdminRequired])
@@ -274,7 +272,7 @@ def update_user_permission(user_id: int, role: Role, session: SessionDep):
     user_data = update_data.model_dump(exclude_unset=True)
     user_data["role"] = role
 
-    user_data["updated_at"] = get_current_timestamp()
+    user_data["updated_at"] = utils.get_current_timestamp()
 
     user_db.sqlmodel_update(user_data)
 

@@ -4,15 +4,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from ..auth_handler import Token, authenticate_user, create_access_token
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
 from ..models.user_model import UserCreate
-from ..utils.auth import Token, authenticate_user, create_access_token
 
 # TODO: implement registration
-# TODO: implement logout
+# TODO: implement logout invalidate token
 # TODO: implement email verification
 # TODO: implement password reset
+# TODO: refresh tocken when in use, reset expire time ,access token and refrsh token
 
 router = APIRouter(
     prefix="/auth",

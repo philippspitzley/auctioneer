@@ -1,15 +1,14 @@
 from typing import Annotated
 
-
 from fastapi import APIRouter, Query
-from sqlmodel import select
 
+from .. import db_handler as db
 from ..dependencies import AdminRequired, SessionDep, UserRequired
 from ..models.auction_model import (
     Auction,
     AuctionPublic,
-    AuctionFilter,
 )
+from ..models.filter_model import AuctionFilter
 
 router = APIRouter(
     prefix="/auctions",
@@ -21,9 +20,7 @@ router = APIRouter(
 async def create_auction(
     auction: Auction, session: SessionDep
 ) -> AuctionPublic:
-    session.add(auction)
-    session.commit()
-    session.refresh(auction)
+    db.add_object(auction, session)
     public_user = AuctionPublic.model_validate(auction)
     return public_user
 
@@ -31,30 +28,45 @@ async def create_auction(
 @router.get("/", dependencies=[UserRequired])
 async def read_auctions(
     session: SessionDep,
-    offset: Annotated[
-        int,
-        Query(
-            ge=0,
-            description="Offset of the first shown auction",
-        ),
-    ] = 0,
-    limit: Annotated[
-        int,
-        Query(
-            le=100,
-            description="Maximum number of auctions",
-        ),
-    ] = 10,
-    order: Annotated[
-        AuctionFilter,
-        Query(
-            description="Sorting order",
-        ),
-    ] = AuctionFilter.id,
-) -> list[AuctionPublic]:
-    stmt = select(Auction).offset(offset).limit(limit).order_by(order)
-    auctions = session.exec(stmt).all()
+    search_term: str | None = None,
+    searched_column: AuctionFilter | None = AuctionFilter.ID,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    order_by: AuctionFilter = AuctionFilter.ID,
+    reverse: bool = False,
+):
+    # stmt = select(Auction).offset(offset).limit(limit).order_by(order_by)
+    # auctions = session.exec(stmt).all()
+
+    auctions = db.read_objects(
+        Auction,
+        session,
+        offset=offset,
+        limit=limit,
+        order_by=order_by,
+        reverse=reverse,
+    )
+
     public_auctions = [
         AuctionPublic.model_validate(auction) for auction in auctions
     ]
     return public_auctions
+
+
+@router.get("/{auction_id}", dependencies=[UserRequired])
+async def read_auction(auction_id: int, session: SessionDep) -> AuctionPublic:
+    # auction = session.get(Auction, auction_id)
+    # if not auction:
+    #     raise HTTPException(status_code=404, detail="Auction not found")
+
+    auction = db.read_object(Auction, session, auction_id)
+    public_auction = AuctionPublic.model_validate(auction)
+    return public_auction
+
+
+@router.delete("/{auction_id}", dependencies=[AdminRequired])
+async def delete_auction(
+    auction_id: int, session: SessionDep
+) -> dict[str, bool]:
+    db.delete_object(auction_id, Auction, session)
+    return {"ok": True}
