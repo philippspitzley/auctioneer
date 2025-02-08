@@ -1,9 +1,13 @@
-from __future__ import annotations  # to use forward references
-
 from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
+
+# Import Product model only for type checking to avoid circular imports
+if TYPE_CHECKING:
+    from .auction_model import Auction
+
 
 # TODO: generate UUI
 # TODO: CRUD pydantic classes
@@ -17,8 +21,12 @@ class Product(SQLModel, table=True):
     created_at: datetime | None = Field(default=None)
     updated_at: datetime | None = Field(default=None)
 
-    categories: Mapped[list[Category]] = Relationship(
+    categories: Mapped[list["Category"]] = Relationship(
         sa_relationship=relationship(back_populates="product")
+    )
+
+    auction: Optional["Auction"] = Relationship(
+        sa_relationship=relationship(back_populates="products")
     )
 
     # TODO: Due to a bug in sqlalchemy, the following line does not work

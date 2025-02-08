@@ -1,10 +1,17 @@
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from pydantic import EmailStr
-from sqlmodel import Field, SQLModel
+from sqlalchemy.orm import Mapped, relationship
+from sqlmodel import Field, Relationship, SQLModel
 
-from ..utils.helper import get_current_timestamp
+from ..utils import get_current_timestamp
+
+# Import Product model only for type checking to avoid circular imports
+if TYPE_CHECKING:
+    from .auction_model import Auction
+
 
 # TODO: generate UUI
 
@@ -28,6 +35,13 @@ class User(UserPublic, table=True):
     password_hash: str
     created_at: datetime = Field(default_factory=get_current_timestamp)
     updated_at: datetime | None = Field(default=None)
+
+    auctions: Mapped[list["Auction"]] = Relationship(
+        sa_relationship=relationship(
+            back_populates="owner",
+            foreign_keys="[Auction.owner_id]",
+        )
+    )
 
 
 class UserMe(UserBase):

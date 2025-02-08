@@ -1,12 +1,18 @@
-from __future__ import annotations  # to use forward references
-
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
-from ..utils.helper import get_current_timestamp
+from ..models.product_model import Product
+from ..utils import get_current_timestamp
+
+# Import Product model only for type checking to avoid circular imports
+if TYPE_CHECKING:
+    from .product_model import Product
+    from .user_model import User
+
 
 # TODO: generate UUI
 
@@ -15,23 +21,6 @@ class State(str, Enum):
     setup = "setup"
     live = "live"
     finished = "finished"
-
-
-class AuctionFilter(str, Enum):
-    id = "id"
-    owner_id = "owner_id"
-    product_id = "product_id"
-    state = "state"
-    start_time = "start_time"
-    end_time = "end_time"
-    starting_price = "starting_price"
-    min_bid = "min_bid"
-    instant_buy_price = "instant_buy_price"
-    buyer_id = "buyer_id"
-    sold = "sold"
-    sold_price = "sold_price"
-    created_at = "created_at"
-    updated_at = "updated_at"
 
 
 class AuctionBase(SQLModel):
@@ -70,8 +59,19 @@ class Auction(SQLModel, table=True):
     created_at: datetime = Field(default_factory=get_current_timestamp)
     updated_at: datetime | None = Field(default=None)
 
-    bids: Mapped[list[Bid]] = Relationship(
+    bids: Mapped[list["Bid"]] = Relationship(
         sa_relationship=relationship(back_populates="auction")
+    )
+
+    products: Mapped[list["Product"]] = Relationship(
+        sa_relationship=relationship(back_populates="auction")
+    )
+
+    owner: Optional["User"] = Relationship(
+        sa_relationship=relationship(
+            back_populates="auctions",
+            foreign_keys="[Auction.owner_id]",
+        )
     )
 
     # TODO: Due to a bug in sqlalchemy, the following line does not work
