@@ -1,5 +1,5 @@
 import yagmail  # Or smtplib, emails, etc.
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from ..config import EMAIL_PASSWORD, EMAIL_USER
 
@@ -8,7 +8,7 @@ router = APIRouter(
     tags=["E-Mail"],
 )
 
-# TODO: integrate html template
+# TODO: html template
 # TODO: use celery with redis for background tasks
 # TODO: Use Mailtrap for testing
 
@@ -28,11 +28,14 @@ def send_email_sync(
         yag.send(to=to, subject=subject, contents=body)
         print(f"Email sent successfully to {to}")  # Add logging
     except Exception as e:
-        print(f"Error sending email to {to}: {e}")  # Add logging
+        print(f"Failed to send email to {to}: {e}")
+        raise HTTPException(
+            status_code=400, detail="Failed to send email to {to}: {e}"
+        )
 
 
 @router.post("/send-email")
-async def send_email_endpoint(
+async def send_email(
     to: str, subject: str, body: str, background_tasks: BackgroundTasks
 ):
     background_tasks.add_task(

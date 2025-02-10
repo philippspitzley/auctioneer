@@ -1,19 +1,34 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
+from jinja2 import Environment, FileSystemLoader
+from premailer import transform
 
 from ..auth_handler import Token, authenticate_user, create_access_token
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
 from ..models.user_model import UserCreate
+from . import users
+from .email import send_email
 
 # TODO: implement registration
 # TODO: implement logout invalidate token
 # TODO: implement email verification
 # TODO: implement password reset
-# TODO: refresh tocken when in use, reset expire time ,access token and refrsh token
+# TODO: refresh token when in use, reset expire time ,access token and refresh token
+
+env = Environment(
+    loader=FileSystemLoader("app/templates")
+)  # "templates" is your template directory
+
 
 router = APIRouter(
     prefix="/auth",
@@ -58,5 +73,25 @@ async def login_for_access_token(
 
 
 @router.post("/register")
-def register_user(user: UserCreate, session: SessionDep):
-    return {"registered": True}
+async def register_user(
+    user: UserCreate, session: SessionDep, background_tasks: BackgroundTasks
+):
+    new_user = await users.create_user(user, session)
+
+    if new_user:
+        # Render the email template
+        template = env.get_template("registration_email.html")
+        login_link = "localhost:8000/Authentication/login_for_access_token_auth_login_post"
+        html_content = template.render(user=new_user, login_link=login_link)
+
+        # Transform the HTML content to inline style for email support
+        html_content = transform(html_content)
+
+        await send_email(
+            to=user.email,
+            subject="Registration Confirmation",
+            body=html_content,
+            background_tasks=background_tasks,
+        )
+
+        return {"registered": True}
