@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import bcrypt
+from colorama import Back, Fore, Style
 from sqlmodel import Session, create_engine
 
 from .config import DB_URI
@@ -32,3 +33,11 @@ engine = create_engine(DB_URI, echo=False)
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+def pretty_print(topic: str, message: str):
+    msg = (
+        f"{(9 - len(topic)) * ' '}{Style.BRIGHT}{Back.YELLOW}{Fore.WHITE} {topic.upper()} {Style.RESET_ALL}  "
+        + message
+    )
+    print(msg)
