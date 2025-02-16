@@ -1,14 +1,13 @@
 # import os
 from logging.config import fileConfig
-from config import DB_URI
 
 from alembic import context
+from app.config import DB_URI
+from app.models.auction_model import Auction, Bid  # noqa: F401
+from app.models.product_model import Category, Product  # noqa: F401
 
 # add all models that are tables
 from app.models.user_model import User  # noqa: F401
-from app.models.auction_model import Auction, Bid # noqa: F401
-from app.models.product_model import Product, Category # noqa: F401
-
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel  # added
 
