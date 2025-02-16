@@ -17,3 +17,6 @@ dummy_data.py
 
 # vscode settings
 .vscode
+
+# macOS
+.DS_Store
