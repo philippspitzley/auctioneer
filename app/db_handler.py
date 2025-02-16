@@ -1,8 +1,17 @@
+from datetime import datetime
 from typing import Annotated, Sequence, Type, TypeVar
 
 from fastapi import Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import (
+    AutoString,
+    DateTime,
+    Float,
+    Integer,
+    Session,
+    SQLModel,
+    select,
+)
 
 import app.utils as utils
 from app.utils import get_session
@@ -10,12 +19,13 @@ from app.utils import get_session
 from .models.filter_model import Filter
 from .models.user_model import User
 
-# bound all types of subclasses from SQLModel to ModelT, used for generic functions
-ModelT = TypeVar("ModelT", bound=SQLModel)
-
 # TODO: add search in all columns at once
 # TODO: add table model to replace ModelT
+# TODO: add created_at to add_object
 
+
+# bound all types of subclasses from SQLModel to ModelT, used for generic functions
+ModelT = TypeVar("ModelT", bound=SQLModel)
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -57,7 +67,7 @@ def read_objects(
 
     if search_term and searched_column:
         column = getattr(obj_type, searched_column)
-        stmt = stmt.where(column.ilike(f"%{search_term}%"))
+        stmt = apply_search_filter(column, search_term, stmt)
 
     stmt = stmt.offset(offset).limit(limit)
 
@@ -69,7 +79,46 @@ def read_objects(
 
         stmt = stmt.order_by(order_by)
 
+    if not session.exec(stmt).all():
+        msg = f"'{search_term}' not found in {str(column).split('.')[-1]}"
+        raise HTTPException(status_code=404, detail=msg)
+
     return session.exec(stmt).all()
+
+
+def apply_search_filter(column, search_term, stmt):
+    if isinstance(column.type, DateTime):
+        try:
+            searched_time = datetime.fromisoformat(search_term)
+        except ValueError:
+            msg = f"Your search term '{search_term}' is not valid. For column '{str(column).split('.')[-1]}' only these values are allowed: YYYY-MM-DD HH:MM:SS"
+            raise HTTPException(status_code=400, detail=msg)
+
+        return stmt.where(column > searched_time)
+
+    elif isinstance(column.type, Integer):
+        if not search_term.isdigit():
+            msg = f"Your search term '{search_term}' is not valid. For column '{str(column).split('.')[-1]}' only positive numbers are allowed."
+            raise HTTPException(status_code=400, detail=msg)
+
+        return stmt.where(column == search_term)
+
+    elif isinstance(column.type, Float):
+        return stmt.where(column == search_term)
+
+    elif isinstance(column.type, AutoString):
+        return stmt.where(column.ilike(f"%{search_term}%"))
+
+    if hasattr(column.type, "enum_class"):
+        enum_class = column.type.enum_class  # type: ignore
+        valid_enum_values = enum_class.__members__.keys()
+        if search_term not in valid_enum_values:
+            msg = f"Your search term '{search_term}' is not valid. For column '{str(column).split('.')[-1]}' only these values are allowed: {list(valid_enum_values)}."
+            raise HTTPException(status_code=400, detail=msg)
+
+        return stmt.where(column == enum_class(search_term))
+
+    return stmt
 
 
 def add_object(obj: ModelT, session: Session) -> ModelT:
