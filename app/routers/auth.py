@@ -19,7 +19,7 @@ from ..models.user_model import UserCreate
 from . import users
 from .email import send_email
 
-# TODO: implement registration
+# TODO: fix register model, remove role
 # TODO: implement logout invalidate token
 # TODO: implement email verification
 # TODO: implement password reset

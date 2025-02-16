@@ -1,12 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy.orm.exc import DetachedInstanceError
 
 import app.db_handler as db
 import app.utils as utils
 
 from ..db_handler import delete_object
 from ..dependencies import AdminRequired, SessionDep, UserRequired
+from ..models.auction_model import AuctionPublic
 from ..models.filter_model import UserFilter
 from ..models.user_model import (
     Role,
@@ -55,10 +57,12 @@ async def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
 @router.get("/", dependencies=[UserRequired])
 async def read_users(
     session: SessionDep,
-    offset: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(le=100)] = 10,
+    search_term: str | None = None,
+    searched_column: UserFilter = UserFilter.USERNAME,
     order_by: UserFilter = UserFilter.USERNAME,
     reverse: bool = False,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> list[UserPublic]:
     """
     ## Retrieve a list of users
@@ -69,9 +73,17 @@ async def read_users(
 
     * `session`: `SessionDep` The database session used for querying.
 
-    * `offset`: `int` The offset of the first user to retrieve.
+    * `search_term`: `str` The search term to filter the users by. The searched column is specified by `searched_column`.
 
-    * `limit`: `int` The maximum number of users to retrieve.
+    * `searched_column`: `UserFilter` The column to search in. Defaults to `UserFilter.USERNAME`.
+
+    * `order_by`: `UserFilter` The column to order the users by. Defaults to `UserFilter.USERNAME`.
+
+    * `reverse`: `bool` Whether to reverse the order. Defaults to `False`.
+
+    * `offset`: `int` The offset of the first user to retrieve. Defaults to `0`.
+
+    * `limit`: `int` The maximum number of users to retrieve. Defaults to `10`.
 
     ### Returns
 
@@ -81,21 +93,19 @@ async def read_users(
 
     * `HTTPException`: If the query fails.
     """
-    # stmt = select(User).offset(offset).limit(limit).order_by(order_by)
-    # users = session.exec(stmt).all()
 
     users = db.read_objects(
         User,
         session,
-        offset=offset,
-        limit=limit,
-        order_by=order_by,
-        reverse=reverse,
+        search_term,
+        searched_column,
+        order_by,
+        reverse,
+        offset,
+        limit,
     )
 
-    public_users = [UserPublic.model_validate(user) for user in users]
-
-    return public_users
+    return [UserPublic.model_validate(user) for user in users]
 
 
 @router.get("/{user_id}", dependencies=[UserRequired])
@@ -144,9 +154,7 @@ async def read_user_me(
 
     * `HTTPException`: If the user is not found.
     """
-    me = UserMe.model_validate(current_user)
-
-    return me
+    return UserMe.model_validate(current_user)
 
 
 @router.patch("/me/")
@@ -183,6 +191,28 @@ async def update_user_me(
     updated_user = update_user(current_user.id, update_data, session)
 
     return UserMe.model_validate(updated_user)
+
+
+@router.get("/me/auctions/")
+async def read_user_auctions(
+    current_user: Annotated[User, UserRequired],
+    session: SessionDep,
+) -> list[AuctionPublic]:
+    public_auctions: list[AuctionPublic] = []
+
+    # try if user has auctions in database
+    try:
+        current_user.auctions
+    except DetachedInstanceError:
+        return public_auctions
+
+    for auction in current_user.auctions:
+        if not auction:
+            continue
+        public_auction = AuctionPublic.model_validate(auction)
+        public_auctions.append(public_auction)
+
+    return public_auctions
 
 
 @router.patch("/{user_id}", dependencies=[AdminRequired])
