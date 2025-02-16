@@ -2,34 +2,32 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
+from fastapi.testclient import TestClient
 
 from .routers import auctions, auth, email, products, users
-
-# from .create_admin import create_admin_user
+from .tasks import scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # create_admin_user()
+    scheduler.start()
     yield
+    scheduler.shutdown()
 
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Auctioneer API",
-    summary="like on the bazar",
-    description="""
-# Welcome to the Auctioneer API! 🚀
-#### This API allows you to manage auctions, users, and products.
-""",
+    title="🚀 Auction Platform Interface 🚀",
+    description="""###  sell or buy your stuff""",
 )
-
 
 app.include_router(users.router)
 app.include_router(auth.router)
 app.include_router(auctions.router)
 app.include_router(products.router)
 app.include_router(email.router)
+
+client = TestClient(app)
 
 
 @app.get("/", response_class=RedirectResponse)
