@@ -6,7 +6,6 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
-# from ..models.product_model import Product
 from ..utils import get_current_timestamp
 
 # Import Product and User model only for type checking to avoid circular imports
@@ -14,8 +13,14 @@ if TYPE_CHECKING:
     from .product_model import Product
     from .user_model import User
 
+# TODO: generate UUI
 # TODO: handle delete of users, products and auction. How to handle foreign keys? Set null? cascade delete? set deleted username? keep auction and product. What if only owner or buyer is deleted?
-# # TODO: generate UUI
+# TODO: Due to a bug in sqlalchemy, the following line does not work
+# bids: list[Bid] = Relationship(
+#     back_populates="auction", cascade_delete=True
+# )
+# TODO: Due to a bug in sqlalchemy, the following line does not work
+# auction: Auction | None = Relationship(back_populates="bids")
 
 
 class State(str, Enum):
@@ -85,18 +90,34 @@ class Auction(AuctionBase, table=True):
             foreign_keys="[Auction.buyer_id]",
         )
     )
-    # TODO: Due to a bug in sqlalchemy, the following line does not work
-    # bids: list[Bid] = Relationship(
-    #     back_populates="auction", cascade_delete=True
-    # )
 
     # Methods
     def has_ended(self) -> bool:
-        if self.state != State.live and self.end_time:
-            return self.end_time < get_current_timestamp()
-        return False
+        """
+        Retrieve whether the auction has ended or not.
+
+        This method checks whether the auction has already been finished or if its end time has passed.
+
+        :return: :obj:`True` if the auction has ended or :obj:`False` if it has not.
+        :rtype: bool
+        """
+        if not self.end_time or self.state != State.finished:
+            return False
+
+        return (
+            self.state == State.finished
+            or self.end_time < get_current_timestamp()
+        )
 
     def get_highest_bidder(self):
+        """
+        Retrieve the highest bidder associated with the auction.
+
+        If no bids are available, :obj:`None` is returned.
+
+        :return: The highest bidder associated with the auction or :obj:`None` if no bids are available.
+        :rtype: :class:`Bid` | None
+        """
         if not self.bids:
             return None
         return max(self.bids, key=lambda bid: bid.amount)
@@ -153,11 +174,6 @@ class AuctionLive(AuctionBase):
     created_at: datetime
     updated_at: datetime | None
 
-    def has_ended(self) -> bool:
-        if self.state != State.live:
-            return self.end_time < get_current_timestamp()
-        return False
-
 
 class Bid(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -174,9 +190,6 @@ class Bid(SQLModel, table=True):
     auction: Auction | None = Relationship(
         sa_relationship=relationship(back_populates="bids")
     )
-
-    # TODO: Due to a bug in sqlalchemy, the following line does not work
-    # auction: Auction | None = Relationship(back_populates="bids")
 
 
 class BidCreate(SQLModel):
