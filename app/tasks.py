@@ -18,5 +18,5 @@ def process_finished_auctions_with_session():
 # Set up the scheduler
 scheduler = BackgroundScheduler()
 # trigger = CronTrigger(hour=13, minute=32)  # run every day on 13:32
-trigger_2 = IntervalTrigger(seconds=5)  # run every 2 minutes
+trigger_2 = IntervalTrigger(hours=6)  # run every 6 hours
 scheduler.add_job(process_finished_auctions_with_session, trigger_2)
