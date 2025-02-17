@@ -26,7 +26,11 @@ router = APIRouter(
 )
 
 
-@router.post("/", dependencies=[AdminRequired])
+@router.post(
+    "/",
+    dependencies=[UserRequired],
+    tags=["User CRUD"],
+)
 async def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     """
     ## Create a new user
@@ -38,6 +42,7 @@ async def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     * user: `UserCreate` The user representation to create.
 
     * session: `SessionDep`: The database session used for querying.
+        * __Not needed for api calls__.
 
     ### Returns
 
@@ -54,7 +59,7 @@ async def create_user(user: UserCreate, session: SessionDep) -> UserPublic:
     return UserPublic.model_validate(db_user)
 
 
-@router.get("/", dependencies=[UserRequired])
+@router.get("/", dependencies=[UserRequired], tags=["User CRUD"])
 async def read_users(
     session: SessionDep,
     search_term: str | None = None,
@@ -71,7 +76,8 @@ async def read_users(
 
     ### Parameters
 
-    * `session`: `SessionDep` The database session used for querying.
+    * `session`: `Annotated[Session, Depends(get_session)]` The database session used for querying.
+        * __Not needed for api calls__.
 
     * `search_term`: `str` The search term to filter the users by. The searched column is specified by `searched_column`.
 
@@ -108,7 +114,7 @@ async def read_users(
     return [UserPublic.model_validate(user) for user in users]
 
 
-@router.get("/{user_id}", dependencies=[UserRequired])
+@router.get("/{user_id}", dependencies=[UserRequired], tags=["User CRUD"])
 async def read_user(user_id: int, session: SessionDep) -> UserPublic:
     """
     ## Retrieve a user by ID
@@ -120,6 +126,7 @@ async def read_user(user_id: int, session: SessionDep) -> UserPublic:
     * `user_id`: `int` The ID of the user to retrieve.
 
     * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
 
     ### Returns
 
@@ -129,7 +136,6 @@ async def read_user(user_id: int, session: SessionDep) -> UserPublic:
 
     * `HTTPException`: If the user is not found.
     """
-    # user = session.get(User, user_id)
     user = db.read_object(User, session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -137,85 +143,7 @@ async def read_user(user_id: int, session: SessionDep) -> UserPublic:
     return public_user
 
 
-@router.get("/me/")
-async def read_user_me(
-    current_user: Annotated[User, UserRequired],
-) -> UserMe:
-    """
-    ## Retrieve the current user
-
-    _Requires user authentication._
-
-    ### Returns
-
-    * `UserMe`: The current user representation:
-
-    ### Raises
-
-    * `HTTPException`: If the user is not found.
-    """
-    return UserMe.model_validate(current_user)
-
-
-@router.patch("/me/")
-async def update_user_me(
-    current_user: Annotated[User, UserRequired],
-    update_data: UserUpdate,
-    session: SessionDep,
-) -> UserMe:
-    """
-    ## Update the current user
-
-    _Requires user authentication._
-
-    ### Parameters
-
-    * `current_user`: `User` The current user representation.
-
-    * `update_data`: `UserUpdate` The data to update the user with.
-
-    * `session`: `SessionDep` The database session used for querying.
-
-    ### Returns
-
-    * `UserMe`: The updated user representation:
-
-    ### Raises
-
-    * `HTTPException`: If the user is not found.
-    """
-    # should not happen because is already checked in UserRequired
-    if not current_user.id:
-        raise HTTPException(status_code=400, detail="User ID not found")
-
-    updated_user = update_user(current_user.id, update_data, session)
-
-    return UserMe.model_validate(updated_user)
-
-
-@router.get("/me/auctions/")
-async def read_user_auctions(
-    current_user: Annotated[User, UserRequired],
-    session: SessionDep,
-) -> list[AuctionPublic]:
-    public_auctions: list[AuctionPublic] = []
-
-    # try if user has auctions in database
-    try:
-        current_user.auctions
-    except DetachedInstanceError:
-        return public_auctions
-
-    for auction in current_user.auctions:
-        if not auction:
-            continue
-        public_auction = AuctionPublic.model_validate(auction)
-        public_auctions.append(public_auction)
-
-    return public_auctions
-
-
-@router.patch("/{user_id}", dependencies=[AdminRequired])
+@router.patch("/{user_id}", dependencies=[UserRequired], tags=["User CRUD"])
 def update_user(
     user_id: int, update_data: UserUpdate, session: SessionDep
 ) -> User:
@@ -245,7 +173,7 @@ def update_user(
     return user_db  # type: ignore
 
 
-@router.delete("/{user_id}", dependencies=[AdminRequired])
+@router.delete("/{user_id}", dependencies=[UserRequired], tags=["User CRUD"])
 def delete_user(user_id: int, session: SessionDep):
     """
     ## Delete a user by ID
@@ -271,7 +199,125 @@ def delete_user(user_id: int, session: SessionDep):
     return {"ok": True}
 
 
-@router.patch("/permission/{user_id}", dependencies=[AdminRequired])
+###############################################################################
+################################ Current User #################################
+###############################################################################
+
+
+@router.get("/me/", tags=["Current User"])
+async def read_user_me(
+    session: SessionDep,
+    current_user: Annotated[User, UserRequired],
+) -> UserMe:
+    """
+    ## Retrieve the current user
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `UserMe`: The current user representation:
+
+    ### Raises
+
+    * `HTTPException`: If the user is not found.
+    """
+    return UserMe.model_validate(current_user)
+
+
+@router.patch("/me/", tags=["Current User"])
+async def update_user_me(
+    current_user: Annotated[User, UserRequired],
+    update_data: UserUpdate,
+    session: SessionDep,
+) -> UserMe:
+    """
+    ## Update the current user
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `current_user`: `User` The current user representation.
+
+    * `update_data`: `UserUpdate` The data to update the user with.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `UserMe`: The updated user representation:
+
+    ### Raises
+
+    * `HTTPException`: If the user is not found.
+    """
+    # should not happen because is already checked in UserRequired
+    if not current_user.id:
+        raise HTTPException(status_code=400, detail="User ID not found")
+
+    updated_user = update_user(current_user.id, update_data, session)
+
+    return UserMe.model_validate(updated_user)
+
+
+@router.get("/me/auctions/", tags=["Current User"])
+async def read_user_auctions(
+    current_user: Annotated[User, UserRequired],
+    session: SessionDep,
+) -> list[AuctionPublic]:
+    """
+    ## Retrieve auctions for the current user
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `current_user`: `Annotated[User, UserRequired]` The current authenticated user.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `list[AuctionPublic]`: A list of public auction representations associated with the current user.
+
+    ### Raises
+
+    * `DetachedInstanceError`: If the user's auction data is not available.
+    """
+
+    public_auctions: list[AuctionPublic] = []
+
+    # try if user has auctions in database
+    try:
+        current_user.auctions
+    except DetachedInstanceError:
+        return public_auctions
+
+    for auction in current_user.auctions:
+        if not auction:
+            continue
+        public_auction = AuctionPublic.model_validate(auction)
+        public_auctions.append(public_auction)
+
+    return public_auctions
+
+
+###############################################################################
+#################################### Admin ####################################
+###############################################################################
+
+
+@router.patch(
+    "/permission/{user_id}", dependencies=[AdminRequired], tags=["Admin"]
+)
 def update_user_permission(user_id: int, role: Role, session: SessionDep):
     """
     ## Update a user's permission
@@ -285,6 +331,7 @@ def update_user_permission(user_id: int, role: Role, session: SessionDep):
     * `role`: `Role` The new role for the user.
 
     * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
 
     ### Returns
 
