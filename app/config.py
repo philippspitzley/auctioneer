@@ -3,6 +3,8 @@ import os
 from colorama import Back, Fore, Style
 from dotenv import load_dotenv
 
+# TODO: use utils.pretty_print for all prints
+
 load_dotenv()
 
 # Security variables
@@ -15,21 +17,6 @@ if not SECRET_KEY:
         f"  {Style.BRIGHT}{Fore.WHITE}{Back.RED} WARNING {Style.RESET_ALL}  "
         f"{Style.BRIGHT}{Fore.RED}SECRET_KEY{Style.NORMAL} is not set! "
         "Please configure it as an environment variable."
-    )
-    print(message)
-
-
-# Admin variables
-# email is currently used for username
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", None)
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", None)
-
-if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-    message = (
-        f"  {Style.BRIGHT}{Fore.WHITE}{Back.RED} WARNING {Style.RESET_ALL}  "
-        f"{Style.BRIGHT}{Fore.RED}ADMIN_USERNAME{Style.NORMAL} and "
-        f"{Style.BRIGHT}ADMIN_PASSWORD{Style.NORMAL} are not set! "
-        "Please configure them as environment variables."
     )
     print(message)
 
