@@ -27,7 +27,7 @@ class ProductCreate(ProductBase):
     pass
 
 
-class Product(SQLModel, table=True):
+class Product(ProductBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     owner_id: int = Field(
         foreign_key="user.id",
@@ -36,6 +36,7 @@ class Product(SQLModel, table=True):
     )
     name: str = Field(index=True)
     description: str | None = Field(default=None)
+    sold: bool = Field(default=False)
     created_at: datetime | None = Field(
         default_factory=get_current_timestamp,
         sa_column=sa.Column(sa.DateTime(timezone=True)),

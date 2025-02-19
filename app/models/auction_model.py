@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
@@ -59,11 +60,22 @@ class Auction(AuctionBase, table=True):
     end_time: datetime | None = Field(
         default=None, sa_column=sa.Column(sa.DateTime(timezone=True))
     )
-    starting_price: float | None = Field(default=None)
-    min_bid: float | None = Field(default=None)
-    instant_buy_price: float | None = Field(default=None)
-    sold: bool = Field(default=False)
-    sold_price: float | None = Field(default=None)
+    starting_price: Decimal | None = Field(
+        default=0.0, ge=0.01, decimal_places=2
+    )
+    min_bid: Decimal | None = Field(
+        default=1.0,
+        ge=1.00,
+        decimal_places=2,
+    )
+    instant_buy_price: Decimal | None = Field(
+        default=None, ge=0.00, decimal_places=2
+    )
+    sold_price: Decimal | None = Field(
+        default=None,
+        ge=0.00,
+        decimal_places=2,
+    )
     created_at: datetime = Field(
         sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False)
     )
@@ -124,15 +136,15 @@ class Auction(AuctionBase, table=True):
 
 
 class AuctionCreate(AuctionBase):
-    starting_price: float | None = None
-    min_bid: float | None = None
-    instant_buy_price: float | None = None
+    starting_price: Decimal | None = None
+    min_bid: Decimal | None = None
+    instant_buy_price: Decimal | None = None
 
 
 class AuctionCreateFromProduct(SQLModel):
-    starting_price: float | None = None
-    min_bid: float | None = None
-    instant_buy_price: float | None = None
+    starting_price: Decimal | None = None
+    min_bid: Decimal | None = None
+    instant_buy_price: Decimal | None = None
 
 
 class AuctionUpdate(AuctionCreate):
@@ -141,8 +153,7 @@ class AuctionUpdate(AuctionCreate):
     state: State | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
-    sold: bool | None = None
-    sold_price: float | None = None
+    sold_price: Decimal | None = None
     buyer_id: int | None = None
 
 
@@ -152,12 +163,11 @@ class AuctionPublic(AuctionBase):
     product_id: int | None
     start_time: datetime | None
     end_time: datetime | None
-    starting_price: float | None
-    min_bid: float | None
-    instant_buy_price: float | None
+    starting_price: Decimal | None
+    min_bid: Decimal | None
+    instant_buy_price: Decimal | None
     buyer_id: int | None
-    sold: bool
-    sold_price: float | None
+    sold_price: Decimal | None
 
 
 class AuctionLive(AuctionBase):
@@ -168,9 +178,9 @@ class AuctionLive(AuctionBase):
     state: State = State.live
     start_time: datetime
     end_time: datetime
-    starting_price: float
-    min_bid: float | None
-    instant_buy_price: float | None
+    starting_price: Decimal
+    min_bid: Decimal | None
+    instant_buy_price: Decimal | None
     created_at: datetime
     updated_at: datetime | None
 
@@ -178,7 +188,7 @@ class AuctionLive(AuctionBase):
 class Bid(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     bidder_id: int = Field(foreign_key="user.id")
-    amount: float
+    amount: Decimal = Field(ge=0.01, decimal_places=2)
     created_at: datetime = Field(
         default_factory=get_current_timestamp,
         sa_column=sa.Column(sa.DateTime(timezone=True)),
@@ -193,4 +203,4 @@ class Bid(SQLModel, table=True):
 
 
 class BidCreate(SQLModel):
-    amount: float
+    amount: Decimal = Field(ge=0.01, decimal_places=2)

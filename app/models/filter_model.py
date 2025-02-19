@@ -16,7 +16,6 @@ class AuctionFilter(Filter):
     MIN_BID = "min_bid"
     INSTANT_BUY_PRICE = "instant_buy_price"
     BUYER_ID = "buyer_id"
-    SOLD = "sold"
     SOLD_PRICE = "sold_price"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
