@@ -10,6 +10,7 @@ from ..dependencies import AdminRequired, SessionDep, UserRequired
 from ..models.auction_model import (
     Auction,
     AuctionCreate,
+    AuctionLive,
     AuctionPublic,
     AuctionUpdate,
     Bid,
@@ -295,7 +296,7 @@ async def bid_on_auction(
     current_user: Annotated[User, UserRequired],
     bid: BidCreate,
     session: SessionDep,
-):
+) -> Bid:
     # TODO: current_user.id check should not happen because is already checked in UserRequired, but implemented it for IDE purposes
     """
     ## Bid on an auction
@@ -326,10 +327,52 @@ async def bid_on_auction(
 
     db_auction = db.read_object(Auction, session, auction_id)
 
-    if db_auction.has_ended():
+    # check if auction is live
+    if db_auction.has_ended() or db_auction.state == State.setup:
         raise HTTPException(
             status_code=400,
-            detail=f"Auction with id {auction_id} is not live. It ended at {db_auction.end_time.strftime('%Y-%m-%d %H:%M')}.",
+            detail=f"Auction with id {auction_id} is not live.",
+        )
+
+    highest_bidder = db_auction.get_highest_bidder()
+    live_auction = AuctionLive.model_validate(db_auction)
+
+    if db_auction.min_bid:
+        min_bid = db_auction.min_bid
+    else:
+        min_bid = live_auction.starting_price
+
+    # check highest bid
+    if not highest_bidder:
+        current_highest_bid = 0
+    else:
+        current_highest_bid = highest_bidder.amount
+
+    # compare current bid with highest bid and starting price
+    if (
+        current_highest_bid + min_bid > bid.amount
+        or live_auction.starting_price >= bid.amount
+    ):
+        # Calculate the minimum bid threshold
+        min_required_bid = (
+            current_highest_bid + min_bid
+            if current_highest_bid > live_auction.starting_price
+            else live_auction.starting_price + min_bid
+        )
+
+        # Construct the detailed error message
+        error_message = (
+            f"Your bid {bid.amount} is too low. | "
+            f"Min amount must be {min_required_bid:,.2f}. | "
+            f"Starting price: {live_auction.starting_price:,.2f}. | "
+            f"Min bid: {min_bid:,.2f}. | "
+            f"Current highest bid: {current_highest_bid:,.2f}. "
+        )
+
+        # Raise the HTTPException with the calculated message
+        raise HTTPException(
+            status_code=400,
+            detail=error_message,
         )
 
     # create new bid
@@ -345,8 +388,7 @@ async def bid_on_auction(
     session.add(db_auction)
     session.commit()
     session.refresh(db_auction)
-
-    return new_bid
+    return db_auction.bids[-1]
 
 
 @router.get(
@@ -512,7 +554,9 @@ def process_finished_auctions(session: Session):
                 auction.buyer_id = highest_bid.bidder_id
                 auction_buyer = True  # to check if email should be sent
                 auction.sold_price = highest_bid.amount
-                auction.sold = True
+                for product in auction.products:
+                    product.sold = True
+
             else:
                 auction_buyer = False  # no email will be sent to buyer
 
