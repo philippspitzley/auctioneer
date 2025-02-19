@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from .. import db_handler as db
+from .. import utils
 from ..dependencies import AdminRequired, SessionDep, UserRequired
 from ..models.auction_model import (
     AuctionCreate,
@@ -10,7 +11,7 @@ from ..models.auction_model import (
     AuctionPublic,
 )
 from ..models.filter_model import ProductFilter
-from ..models.product_model import Category, Product
+from ..models.product_model import Category, Product, ProductCreate
 from ..models.user_model import UserPublic
 from .auctions import create_auction
 
@@ -25,7 +26,9 @@ router = APIRouter(
     dependencies=[AdminRequired],
     tags=["Auction Live Cycle", "Product CRUD"],
 )
-async def create_product(product: Product, session: SessionDep) -> Product:
+async def create_product(
+    product: ProductCreate, session: SessionDep
+) -> Product:
     """
     ## Create a new product
 
@@ -46,7 +49,11 @@ async def create_product(product: Product, session: SessionDep) -> Product:
 
     * `HTTPException`: If the product already exists.
     """
-    return db.add_object(product, session)
+    product_dict = product.model_dump()
+    time_stamp = utils.get_current_timestamp()
+
+    new_product = Product(**product_dict, created_at=time_stamp)
+    return db.add_object(new_product, session)
 
 
 @router.get(
