@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from .. import db_handler as db
 from .. import utils
@@ -254,6 +254,10 @@ async def create_auction_for_product(
     * `HTTPException`: If the product is not found or the auction is invalid.
     """
     product = db.read_object(Product, session, product_id)
+    if product.sold:
+        raise HTTPException(
+            status_code=400, detail="Product has already been sold"
+        )
     auction_dict = auction.model_dump()
     new_auction = AuctionCreate(
         **auction_dict,
