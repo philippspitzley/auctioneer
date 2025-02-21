@@ -3,23 +3,20 @@ from typing import Annotated
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     HTTPException,
     status,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from jinja2 import Environment, FileSystemLoader
-from premailer import transform
 
 from ..auth_handler import Token, authenticate_user, create_access_token
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
-from ..models.user_model import UserCreate
+from ..models.user_model import UserCreate, UserRegister
 from . import users
-from .email import send_email
+from ..async_mail import send_email_async
 
-# TODO: fix register model, remove role
 # TODO: implement logout invalidate token
 # TODO: implement email verification
 # TODO: implement password reset
@@ -73,25 +70,42 @@ async def login_for_access_token(
 
 
 @router.post("/register")
-async def register_user(
-    user: UserCreate, session: SessionDep, background_tasks: BackgroundTasks
-):
-    new_user = await users.create_user(user, session)
+async def register_user(user: UserRegister, session: SessionDep):
+    """
+    ## Register a new user
+
+    This endpoint allows users to register a new account.
+
+    ### Parameters
+
+    * `user`: `UserRegister` The user data to register.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    * `background_tasks`: `BackgroundTasks` The background tasks used for sending emails.
+
+    ### Returns
+
+    * `dict[str, bool|User]`: A dictionary with a single key-value pair, {"registered": True, "user": User}.
+
+    ### Raises
+
+    * `HTTPException`: If the user is not created.
+    """
+
+    user_create = UserCreate.model_validate(user)
+    new_user = await users.create_user(user_create, session)
 
     if new_user:
         # Render the email template
         template = env.get_template("registration_email.html")
-        login_link = "localhost:8000/Authentication/login_for_access_token_auth_login_post"
+        login_link = "localhost:8000/fake_login"
         html_content = template.render(user=new_user, login_link=login_link)
 
-        # Transform the HTML content to inline style for email support
-        html_content = transform(html_content)
+        email = user.email
+        subject = "Registration Confirmation"
+        body = html_content
+        await send_email_async(email, subject, body)
 
-        await send_email(
-            to=user.email,
-            subject="Registration Confirmation",
-            body=html_content,
-            background_tasks=background_tasks,
-        )
-
-        return {"registered": True}
+        return {"registered": True, "user": new_user}

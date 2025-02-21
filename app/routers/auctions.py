@@ -1,5 +1,6 @@
+import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import Session
@@ -19,9 +20,7 @@ from ..models.auction_model import (
 )
 from ..models.filter_model import AuctionFilter
 from ..models.user_model import User
-
-if TYPE_CHECKING:
-    from ..main import client
+from ..async_mail import send_email_async
 
 router = APIRouter(
     prefix="/auctions",
@@ -60,6 +59,7 @@ async def create_auction(
 
     * `HTTPException`: If the auction already exists.
     """
+
     auction_dict = auction.model_dump()
     time_stamp = utils.get_current_timestamp()
 
@@ -224,6 +224,7 @@ async def delete_auction(
 
     * `HTTPException`: If the auction is not found.
     """
+
     db.delete_object(auction_id, Auction, session)
     return {"ok": True}
 
@@ -266,6 +267,7 @@ async def start_auction(
 
     * `HTTPException`: If the auction is not found or is not in {State.setup} state.
     """
+
     db_auction = db.read_object(Auction, session, auction_id)
 
     if db_auction.state != State.setup:
@@ -297,7 +299,6 @@ async def bid_on_auction(
     bid: BidCreate,
     session: SessionDep,
 ) -> Bid:
-    # TODO: current_user.id check should not happen because is already checked in UserRequired, but implemented it for IDE purposes
     """
     ## Bid on an auction
 
@@ -322,6 +323,8 @@ async def bid_on_auction(
 
     * `HTTPException`: If the auction is not found or is not in {State.live} state.
     """
+
+    # TODO: current_user.id check should not happen because is already checked in UserRequired, but implemented it for IDE purposes
     if not current_user.id:
         raise HTTPException(status_code=400, detail="User ID not found")
 
@@ -454,6 +457,7 @@ async def get_highest_bidder(
 
     * `HTTPException`: If no bids are found for the auction.
     """
+
     db_auction = db.read_object(Auction, session, auction_id)
     highest_bidder = db_auction.get_highest_bidder()
     if not highest_bidder:
@@ -554,8 +558,12 @@ def process_finished_auctions(session: Session):
                 auction.buyer_id = highest_bid.bidder_id
                 auction_buyer = True  # to check if email should be sent
                 auction.sold_price = highest_bid.amount
-                for product in auction.products:
-                    product.sold = True
+                auction.updated_at = utils.get_current_timestamp()
+                if isinstance(auction.products, list):
+                    for product in auction.products:
+                        product.sold = True
+                else:
+                    auction.products.sold = True
 
             else:
                 auction_buyer = False  # no email will be sent to buyer
@@ -568,28 +576,28 @@ def process_finished_auctions(session: Session):
             finished_auction_counter += 1
 
             # send mail to auction owner
-            email_data = {
-                "to": auction.owner.email,
-                "subject": "Auction finished",
-                "body": f"Auction with id {auction.id} has finished.",
-            }
-            client.post("/email/send-email", json=email_data)
+            email = auction.owner.email  # type: ignore
+            subject = "Auction finished!"
+            body = f"Auction with id {auction.id} has finished."
+
+            asyncio.run(send_email_async(email, subject, body))
 
             utils.pretty_print(
-                "....", f"Send email to owner: {auction.owner.email}"
+                "....",
+                f"Sent email to owner: {auction.owner.email}",  # type: ignore
             )
 
             # send mail to buyer / highest bidder
             if auction_buyer:
-                email_data = {
-                    "to": auction.buyer.email,
-                    "subject": "Auction finished",
-                    "body": f"You won an auction with id {auction.id}.",
-                }
-                client.post("/email/send-email", json=email_data)
+                email = auction.buyer.email  # type: ignore
+                subject = "Auction finished!"
+                body = f"Gratulation {auction.buyer.username}, you  ."  # type: ignore
+
+                asyncio.run(send_email_async(email, subject, body))
 
                 utils.pretty_print(
-                    "....", f"Send email to buyer: {auction.buyer.email}"
+                    "....",
+                    f"Sent email to buyer: {auction.buyer.email}",  # type: ignore
                 )
 
     utils.pretty_print(

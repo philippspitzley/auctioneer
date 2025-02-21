@@ -76,6 +76,10 @@ class UserCreate(UserBase):
     role: Role = Role.user
 
 
+class UserRegister(UserBase):
+    password: str
+
+
 class UserUpdate(UserBase):
     username: str | None = None
     email: EmailStr | None = None
