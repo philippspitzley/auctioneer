@@ -1,6 +1,4 @@
-from apscheduler.schedulers.background import (
-    BackgroundScheduler,  # runs tasks in the background
-)
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlmodel import Session
 
@@ -17,6 +15,19 @@ def process_finished_auctions_with_session():
 
 # Set up the scheduler
 scheduler = BackgroundScheduler()
-# trigger = CronTrigger(hour=13, minute=32)  # run every day on 13:32
-trigger_2 = IntervalTrigger(hours=6)  # run every 6 hours
-scheduler.add_job(process_finished_auctions_with_session, trigger_2)
+trigger = IntervalTrigger(minutes=5)
+scheduler.add_job(process_finished_auctions_with_session, trigger)
+
+
+# def schedule_one_time_task(func, seconds_from_now: int = 1, **kwargs):
+#     run_time = datetime.now(timezone.utc) + timedelta(seconds=seconds_from_now)
+
+#     scheduler.add_job(
+#         func,
+#         kwargs=kwargs,
+#         trigger="date",
+#         run_date=run_time,
+#         id=f"one_time_task_{run_time.timestamp()}",
+#         replace_existing=True,  # Avoid duplicate jobs with same ID
+#     )
+#     print(f"Task {func.__name__} scheduled to run at {run_time}")
