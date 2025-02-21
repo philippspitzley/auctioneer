@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from .. import db_handler as db
 from .. import utils
+from ..async_mail import send_email_async
 from ..dependencies import AdminRequired, SessionDep, UserRequired
 from ..models.auction_model import (
     Auction,
@@ -20,7 +21,6 @@ from ..models.auction_model import (
 )
 from ..models.filter_model import AuctionFilter
 from ..models.user_model import User
-from ..async_mail import send_email_async
 
 router = APIRouter(
     prefix="/auctions",
@@ -578,7 +578,7 @@ def process_finished_auctions(session: Session):
             # send mail to auction owner
             email = auction.owner.email  # type: ignore
             subject = "Auction finished!"
-            body = f"Auction with id {auction.id} has finished."
+            body = f"Auction with id {auction.id} has finished. Sold for {auction.sold_price} from {auction.buyer.username}."  # type: ignore
 
             asyncio.run(send_email_async(email, subject, body))
 
@@ -591,7 +591,7 @@ def process_finished_auctions(session: Session):
             if auction_buyer:
                 email = auction.buyer.email  # type: ignore
                 subject = "Auction finished!"
-                body = f"Gratulation {auction.buyer.username}, you  ."  # type: ignore
+                body = f"Gratulation {auction.buyer.username}, you have won the auction with id {auction.id} with a price of {auction.sold_price}."  # type: ignore
 
                 asyncio.run(send_email_async(email, subject, body))
 

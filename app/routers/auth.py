@@ -10,12 +10,12 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from jinja2 import Environment, FileSystemLoader
 
+from ..async_mail import send_email_async
 from ..auth_handler import Token, authenticate_user, create_access_token
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
 from ..models.user_model import UserCreate, UserRegister
 from . import users
-from ..async_mail import send_email_async
 
 # TODO: implement logout invalidate token
 # TODO: implement email verification
@@ -100,7 +100,7 @@ async def register_user(user: UserRegister, session: SessionDep):
     if new_user:
         # Render the email template
         template = env.get_template("registration_email.html")
-        login_link = "localhost:8000/fake_login"
+        login_link = "https://auctioneer-s5l2.onrender.com/fake_login"
         html_content = template.render(user=new_user, login_link=login_link)
 
         email = user.email
