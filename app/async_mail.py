@@ -1,3 +1,4 @@
+import asyncio
 import os
 from email.message import EmailMessage
 
@@ -32,3 +33,8 @@ async def send_email_async(email, subject, body, text="Hello"):
         password=SMTP_PASSWORD,
         start_tls=True,
     )
+
+
+def send_email_sync(email, subject, body, text="Hello"):
+    """Asynchronous function to send an email using aiosmtplib."""
+    asyncio.run(send_email_async(email, subject, body, text))

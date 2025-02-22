@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     HTTPException,
     status,
@@ -10,7 +11,7 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from jinja2 import Environment, FileSystemLoader
 
-from ..async_mail import send_email_async
+from ..async_mail import send_email_sync
 from ..auth_handler import Token, authenticate_user, create_access_token
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
@@ -70,7 +71,9 @@ async def login_for_access_token(
 
 
 @router.post("/register")
-async def register_user(user: UserRegister, session: SessionDep):
+async def register_user(
+    user: UserRegister, session: SessionDep, background_task: BackgroundTasks
+):
     """
     ## Register a new user
 
@@ -106,6 +109,9 @@ async def register_user(user: UserRegister, session: SessionDep):
         email = user.email
         subject = "Registration Confirmation"
         body = html_content
-        await send_email_async(email, subject, body)
+
+        # adding background task reduce loadtime on swagger ui
+        background_task.add_task(send_email_sync, email, subject, body)
+        # await send_email_async(email, subject, body)
 
         return {"registered": True, "user": new_user}
