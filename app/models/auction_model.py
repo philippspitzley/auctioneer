@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from .product_model import Product
     from .user_model import User
 
-# TODO: generate UUI
 # TODO: handle delete of users, products and auction. How to handle foreign keys? Set null? cascade delete? set deleted username? keep auction and product. What if only owner or buyer is deleted?
 # TODO: Due to a bug in sqlalchemy, the following line does not work
 # bids: list[Bid] = Relationship(
@@ -68,6 +67,7 @@ class Auction(AuctionBase, table=True):
         ge=1.00,
         decimal_places=2,
     )
+    instant_buy: bool = Field(default=False)
     instant_buy_price: Decimal | None = Field(
         default=None, ge=0.00, decimal_places=2
     )
@@ -113,15 +113,18 @@ class Auction(AuctionBase, table=True):
         :return: :obj:`True` if the auction has ended or :obj:`False` if it has not.
         :rtype: bool
         """
-        if not self.end_time or self.state != State.finished:
+
+        if not self.end_time:
             return False
 
+        now = datetime.now(timezone.utc)
         return (
             self.state == State.finished
-            or self.end_time < get_current_timestamp()
+            or self.end_time < now
+            or self.instant_buy is True
         )
 
-    def get_highest_bidder(self):
+    def get_highest_bidder(self) -> Optional["Bid"]:
         """
         Retrieve the highest bidder associated with the auction.
 
@@ -166,6 +169,7 @@ class AuctionPublic(AuctionBase):
     starting_price: Decimal | None
     min_bid: Decimal | None
     instant_buy_price: Decimal | None
+    instant_buy: bool | None
     buyer_id: int | None
     sold_price: Decimal | None
 
@@ -181,6 +185,7 @@ class AuctionLive(AuctionBase):
     starting_price: Decimal
     min_bid: Decimal | None
     instant_buy_price: Decimal | None
+    instant_buy: bool
     created_at: datetime
     updated_at: datetime | None
 

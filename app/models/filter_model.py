@@ -15,6 +15,7 @@ class AuctionFilter(Filter):
     STARTING_PRICE = "starting_price"
     MIN_BID = "min_bid"
     INSTANT_BUY_PRICE = "instant_buy_price"
+    INSTANT_BUY = "instant_buy"
     BUYER_ID = "buyer_id"
     SOLD_PRICE = "sold_price"
     CREATED_AT = "created_at"
@@ -33,6 +34,7 @@ class ProductFilter(Filter):
     ID = "id"
     NAME = "name"
     DESCRIPTION = "description"
+    SOLD = "sold"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 

@@ -1,5 +1,6 @@
 import asyncio
 from datetime import timedelta
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
@@ -22,10 +23,7 @@ from ..models.auction_model import (
 from ..models.filter_model import AuctionFilter
 from ..models.user_model import User
 
-router = APIRouter(
-    prefix="/auctions",
-    tags=["Auction"],
-)
+router = APIRouter(prefix="/auctions")
 
 
 @router.post(
@@ -298,7 +296,7 @@ async def bid_on_auction(
     current_user: Annotated[User, UserRequired],
     bid: BidCreate,
     session: SessionDep,
-) -> Bid:
+) -> dict[str, bool | Bid]:
     """
     ## Bid on an auction
 
@@ -332,66 +330,118 @@ async def bid_on_auction(
 
     # check if auction is live
     if db_auction.has_ended() or db_auction.state == State.setup:
+        end_time = db_auction.end_time if db_auction.end_time else None
         raise HTTPException(
             status_code=400,
-            detail=f"Auction with id {auction_id} is not live.",
+            detail={
+                "message": f"You cannot bid on auction {auction_id}.",
+                "state": db_auction.state,
+                "ended": end_time < utils.get_current_timestamp()
+                if end_time
+                else False,
+                "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S")
+                if end_time
+                else None,
+                "instant_buy": db_auction.instant_buy,
+            },
         )
 
+    # end auction early if instant buy
+    if (
+        db_auction.instant_buy_price
+        and bid.amount >= db_auction.instant_buy_price
+    ):
+        new_bid = create_bid(
+            auction_id, current_user.id, bid, session, db_auction
+        )
+        new_bid.amount = db_auction.instant_buy_price
+        db_auction.instant_buy = True
+        db_auction.end_time = new_bid.created_at
+        session.commit()
+        session.refresh(new_bid)
+        return {"bid": new_bid, "instant_buy": True}
+
+    # check for highest bidder
     highest_bidder = db_auction.get_highest_bidder()
     live_auction = AuctionLive.model_validate(db_auction)
 
-    if db_auction.min_bid:
-        min_bid = db_auction.min_bid
-    else:
-        min_bid = live_auction.starting_price
+    # check for min bid
+    min_bid = db_auction.min_bid if db_auction.min_bid else Decimal("0.01")
 
-    # check highest bid
-    if not highest_bidder:
-        current_highest_bid = 0
-    else:
-        current_highest_bid = highest_bidder.amount
+    # check for highest bid
+    current_highest_bid = (
+        highest_bidder.amount if highest_bidder else Decimal("0")
+    )
 
-    # compare current bid with highest bid and starting price
-    if (
-        current_highest_bid + min_bid > bid.amount
-        or live_auction.starting_price >= bid.amount
-    ):
-        # Calculate the minimum bid threshold
-        min_required_bid = (
-            current_highest_bid + min_bid
-            if current_highest_bid > live_auction.starting_price
-            else live_auction.starting_price + min_bid
-        )
-
-        # Construct the detailed error message
-        error_message = (
-            f"Your bid {bid.amount} is too low. | "
-            f"Min amount must be {min_required_bid:,.2f}. | "
-            f"Starting price: {live_auction.starting_price:,.2f}. | "
-            f"Min bid: {min_bid:,.2f}. | "
-            f"Current highest bid: {current_highest_bid:,.2f}. "
+    # check if bid is too low
+    bid_too_low = is_bid_too_low(
+        bid.amount, current_highest_bid, live_auction, min_bid
+    )
+    if bid_too_low:
+        min_required_bid = calculate_min_required_bid(
+            live_auction, current_highest_bid, min_bid
         )
 
         # Raise the HTTPException with the calculated message
         raise HTTPException(
             status_code=400,
-            detail=error_message,
+            detail={
+                "message": "Bid is too low.",
+                "bid": float(bid.amount),
+                "min_required_bid": float(min_required_bid),
+                "starting_price": float(live_auction.starting_price),
+                "min_bid": float(min_bid),
+                "highest_bid": float(current_highest_bid),
+            },
         )
 
     # create new bid
+    new_bid = create_bid(auction_id, current_user.id, bid, session, db_auction)
+    return {"bid": new_bid, "instant_buy": False}
+
+
+def calculate_min_required_bid(live_auction, current_highest_bid, min_bid):
+    """Calculate the minimum required bid."""
+    if current_highest_bid == 0 and live_auction.starting_price == 0:
+        return live_auction.starting_price + min_bid
+    return max(live_auction.starting_price, current_highest_bid + min_bid)
+
+
+def is_bid_too_low(bid_amount, current_highest_bid, live_auction, min_bid):
+    """Check if the bid is below starting price or minimum increment."""
+    # Case 1: Bid is below starting price
+    if current_highest_bid == 0 and bid_amount < live_auction.starting_price:
+        return True
+
+    # Case 2: Bid is below the minimum increment
+    if current_highest_bid > 0 and bid_amount < current_highest_bid + min_bid:
+        return True
+
+    return False
+
+
+def create_bid(
+    auction_id: int,
+    current_user_id: int,
+    bid: BidCreate,
+    session: Session,
+    db_auction: Auction,
+):
     bid_dict = bid.model_dump()
     new_bid = Bid(
         **bid_dict,
-        bidder_id=current_user.id,
+        bidder_id=current_user_id,
         auction_id=auction_id,
         created_at=utils.get_current_timestamp(),
     )
 
     db_auction.bids.append(new_bid)
-    session.add(db_auction)
+    # session.add(db_auction)
+    session.add(new_bid)
     session.commit()
-    session.refresh(db_auction)
-    return db_auction.bids[-1]
+    # session.refresh(db_auction)
+    session.refresh(new_bid)
+    return new_bid
 
 
 @router.get(
@@ -465,7 +515,7 @@ async def get_highest_bidder(
     return highest_bidder
 
 
-@router.get("/finished_auctions/")
+@router.get("/finished_auctions/", tags=["Auction Live Cycle"])
 def get_finished_auctions(session: SessionDep) -> list[AuctionPublic]:
     """
     ## Retrieve a list of finished auctions
@@ -538,7 +588,7 @@ def process_finished_auctions(session: Session):
         utils.pretty_print("....", f"No live auctions: {e.detail}")
         return
 
-    finished_auction_counter = 0
+    finished_auctions = []
 
     for auction in all_live_auctions:
         if not auction.end_time:
@@ -551,55 +601,66 @@ def process_finished_auctions(session: Session):
 
         current_time = utils.get_current_timestamp()
 
-        if auction.end_time < current_time:
-            highest_bid = auction.get_highest_bidder()
-
-            if highest_bid and highest_bid.amount > 0:
-                auction.buyer_id = highest_bid.bidder_id
-                auction_buyer = True  # to check if email should be sent
-                auction.sold_price = highest_bid.amount
-                auction.updated_at = utils.get_current_timestamp()
-                if isinstance(auction.products, list):
-                    for product in auction.products:
-                        product.sold = True
-                else:
-                    auction.products.sold = True
-
-            else:
-                auction_buyer = False  # no email will be sent to buyer
-
-            auction.state = State.finished
-
-            session.commit()
-            session.refresh(auction)
-
-            finished_auction_counter += 1
-
-            # send mail to auction owner
-            email = auction.owner.email  # type: ignore
-            subject = "Auction finished!"
-            body = f"Auction with id {auction.id} has finished. Sold for {auction.sold_price} from {auction.buyer.username}."  # type: ignore
-
-            asyncio.run(send_email_async(email, subject, body))
-
-            utils.pretty_print(
-                "....",
-                f"Sent email to owner: {auction.owner.email}",  # type: ignore
-            )
-
-            # send mail to buyer / highest bidder
-            if auction_buyer:
-                email = auction.buyer.email  # type: ignore
-                subject = "Auction finished!"
-                body = f"Gratulation {auction.buyer.username}, you have won the auction with id {auction.id} with a price of {auction.sold_price}."  # type: ignore
-
-                asyncio.run(send_email_async(email, subject, body))
-
-                utils.pretty_print(
-                    "....",
-                    f"Sent email to buyer: {auction.buyer.email}",  # type: ignore
-                )
+        if auction.end_time < current_time or auction.instant_buy:
+            finish_auction(auction, session)
+            finished_auctions.append(auction.id)
 
     utils.pretty_print(
-        "....", f"Finished {finished_auction_counter} auctions..."
+        "....",
+        f"Finished {len(finished_auctions)} auctions: {finished_auctions}",
     )
+
+
+def finish_auction(auction: Auction, session: Session) -> Auction:
+    highest_bid = auction.get_highest_bidder()
+
+    if highest_bid and highest_bid.amount > 0:
+        auction.buyer_id = highest_bid.bidder_id
+        auction.sold_price = highest_bid.amount
+        auction.updated_at = utils.get_current_timestamp()
+
+        if isinstance(auction.products, list):
+            for product in auction.products:
+                product.sold = True
+                product.updated_at = utils.get_current_timestamp()
+        else:
+            auction.products.sold = True
+
+        auction_buyer = True  # to check if email should be sent to buyer
+
+    else:
+        auction_buyer = False  # no email will be sent to buyer
+
+    auction.state = State.finished
+
+    session.add(auction)
+    session.commit()
+    session.refresh(auction)
+
+    # send mail to auction owner
+    email = auction.owner.email  # type: ignore
+    subject = "Auction finished!"
+    body = f"Auction with id {auction.id} has finished."
+    if auction.buyer:
+        body += f"Sold for {auction.sold_price} from {auction.buyer.username}."
+
+    asyncio.run(send_email_async(email, subject, body))
+
+    utils.pretty_print(
+        "....",
+        f"Sent email to owner: {auction.owner.email}",  # type: ignore
+    )
+
+    # send mail to buyer / highest bidder
+    if auction_buyer:
+        email = auction.buyer.email  # type: ignore
+        subject = "Auction finished!"
+        body = f"Gratulation {auction.buyer.username}, you have won the auction with id {auction.id} with a price of {auction.sold_price}."  # type: ignore
+
+        asyncio.run(send_email_async(email, subject, body))
+
+        utils.pretty_print(
+            "....",
+            f"Sent email to buyer: {auction.buyer.email}",  # type: ignore
+        )
+    return auction
