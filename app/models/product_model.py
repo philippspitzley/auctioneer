@@ -50,7 +50,7 @@ class Product(ProductBase, table=True):
         sa_relationship=relationship(back_populates="product")
     )
     auction: Optional["Auction"] = Relationship(
-        sa_relationship=relationship(back_populates="products")
+        sa_relationship=relationship(back_populates="product")
     )
     owner: Optional["User"] = Relationship(
         sa_relationship=relationship(back_populates="products")

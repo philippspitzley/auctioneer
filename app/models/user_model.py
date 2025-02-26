@@ -56,12 +56,6 @@ class User(UserPublic, table=True):
             back_populates="owner",
         )
     )
-    sold_auctions: Mapped[list["Auction"]] = Relationship(
-        sa_relationship=relationship(
-            back_populates="buyer",
-            foreign_keys="[Auction.buyer_id]",
-        )
-    )
 
 
 class UserMe(UserBase):

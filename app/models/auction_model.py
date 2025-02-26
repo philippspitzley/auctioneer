@@ -87,10 +87,10 @@ class Auction(AuctionBase, table=True):
     bids: Mapped[list["Bid"]] = Relationship(
         sa_relationship=relationship(back_populates="auction")
     )
-    products: Mapped[list["Product"]] = Relationship(
+    product: "Product" = Relationship(
         sa_relationship=relationship(back_populates="auction")
     )
-    owner: Optional["User"] = Relationship(
+    owner: "User" = Relationship(
         sa_relationship=relationship(
             back_populates="auctions",
             foreign_keys="[Auction.owner_id]",
@@ -124,7 +124,7 @@ class Auction(AuctionBase, table=True):
             or self.instant_buy is True
         )
 
-    def get_highest_bidder(self) -> Optional["Bid"]:
+    def get_highest_bid(self) -> Optional["Bid"]:
         """
         Retrieve the highest bidder associated with the auction.
 
