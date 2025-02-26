@@ -1,11 +1,17 @@
 import os
 
+import uvicorn
 from colorama import Back, Fore, Style
 from dotenv import load_dotenv
+from jinja2 import Environment, FileSystemLoader
 
 # TODO: use utils.pretty_print for all prints
 
 load_dotenv()
+
+# FastAPI Host Url
+port = uvicorn.Config(app="app.main:app").port
+HOST_URL = os.environ.get("HOST_URL", "http://localhost:{port}")
 
 # Security variables
 SECRET_KEY = os.environ.get("SECRET_KEY", None)
@@ -43,3 +49,7 @@ if not EMAIL_USER or not EMAIL_PASSWORD:
         "Please configure them as environment variables."
     )
     print(message)
+
+# Jinja Templates
+JINJA_ENV = Environment(loader=FileSystemLoader("app/templates"))
+JINJA_AUCTION_EMAIL_TEMPLATE = "finished_auction_email.html"
