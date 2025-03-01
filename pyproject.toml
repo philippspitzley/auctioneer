@@ -15,7 +15,9 @@ dependencies = [
     "premailer>=3.10.0",
     "psycopg2>=2.9.10",
     "pyjwt>=2.10.1",
+    "pytest>=8.3.4",
     "python-dotenv>=1.0.1",
+    "pytz>=2025.1",
     "sqlmodel>=0.0.22",
     "yagmail>=0.15.293",
 ]
