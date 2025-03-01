@@ -1,0 +1,17 @@
+{% extends "base_email.html" %} {% block title %}Auctioneer: Finished Auction{%
+endblock %} {% block header %}Auction {{ product.name }} ended!{% endblock %} {%
+block content %}
+<p>Dear {{ user.username }},</p>
+
+<p>Your auction with {{ product.name }} has ended!</p>
+
+{% if auction.buyer %}
+<p>{{ auction.buyer.username }} bought it for {{ auction.sold_price }}$.</p>
+<a href="{{ auction_link }}" class="cta-button">Auction Details</a>
+
+{% else %}
+<p>Unfortunately your product could not be auctioned. Give it another try:</p>
+<a href="{{ create_new_auction_link }}" class="cta-button"
+  >Create New Auction</a
+>
+{% endif %}%} {% endblock %}
