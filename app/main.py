@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 
 from .routers import auctions, auth, products, users
-from .tasks import scheduler
+from .services.tasks import scheduler
 
 
 @asynccontextmanager
