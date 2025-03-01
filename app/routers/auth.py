@@ -11,7 +11,7 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from jinja2 import Environment, FileSystemLoader
 
-from ..async_mail import send_email_sync
+from ..services.async_mail import send_email_sync
 from ..auth_handler import Token, authenticate_user, create_access_token
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import SessionDep
@@ -36,7 +36,7 @@ router = APIRouter(
 
 @router.post("/login")
 async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
 ) -> Token:
     """
     ## Obtain an access token for a user
@@ -56,7 +56,7 @@ async def login_for_access_token(
     * `HTTPException`: If the username or password is incorrect.
     """
 
-    user = authenticate_user(form_data.username, form_data.password)
+    user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

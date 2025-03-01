@@ -4,7 +4,7 @@ from fastapi import Depends
 from sqlmodel import Session
 
 from .auth_handler import get_current_admin, get_current_user
-from .utils import get_session
+from .db import get_session
 
 # function dependencies
 SessionDep = Annotated[Session, Depends(get_session)]

@@ -2,9 +2,6 @@ from datetime import datetime, timezone
 
 import bcrypt
 from colorama import Back, Fore, Style
-from sqlmodel import Session, create_engine
-
-from .config import DB_URI
 
 
 def get_current_timestamp():
@@ -24,15 +21,6 @@ def verify_password(plain_password, hashed_password):
     return bcrypt.checkpw(
         password=password_byte_enc, hashed_password=hashed_password_enc
     )
-
-
-# database connection
-engine = create_engine(DB_URI, echo=False)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
 
 
 def pretty_print(topic: str, message: str):

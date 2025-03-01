@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Annotated, Sequence, Type, TypeVar
+from typing import Sequence, Type, TypeVar
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import (
     AutoString,
@@ -13,26 +13,21 @@ from sqlmodel import (
     select,
 )
 
-import app.utils as utils
-from app.utils import get_session
-
+from . import utils
 from .models.filter_model import Filter
 from .models.user_model import User
 
 # TODO: add search in all columns at once
 # TODO: add table model to replace ModelT
-# TODO: add created_at to add_object
 
 
 # bound all types of subclasses from SQLModel to ModelT, used for generic functions
 ModelT = TypeVar("ModelT", bound=SQLModel)
 
-SessionDep = Annotated[Session, Depends(get_session)]
-
 
 def read_object(
     obj_type: Type[ModelT],
-    session: SessionDep,
+    session: Session,
     obj_id: int | None = None,
     column_name: Filter | None = None,
     search_term: str | None = None,
@@ -130,10 +125,8 @@ def add_object(obj: ModelT, session: Session) -> ModelT:
         session.rollback()
 
         # extract DETAIL from error:
-
         # EXAMPLE: (psycopg2.errors.ForeignKeyViolation) insert or update on table "auction" violates foreign key constraint "auction_buyer_id_fkey"
         # DETAIL:  Key (buyer_id)=(0) is not present in table "user".
-
         # BECOMES: "Key (buyer_id)=(0) is not present in table 'user'."
         error: str = e.args[0].split("DETAIL: ")[-1].strip().replace('"', "'")
 

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from . import utils
+from . import db
 from .config import ALGORITHM, SECRET_KEY
 from .models.user_model import User
 
@@ -22,6 +23,8 @@ class TokenData(BaseModel):
     username: str | None = None
 
 
+SessionDep = Annotated[Session, Depends(db.get_session)]
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/")
 
 # Contrary to the fastapi documentation, I have removed passlib and used bcrypt directly,
@@ -32,14 +35,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/")
 # Replaced get_password_hash and verify_password with new bcrypt functions
 
 
-def get_user(username: str | None = None) -> User | None:
-    with Session(utils.engine) as session:
+def get_user(session: Session, username: str | None = None) -> User | None:
+    if username:
         user = session.exec(select(User).where(User.email == username)).first()
         return user
 
 
-def authenticate_user(username: str, password: str):
-    user = get_user(username)
+def authenticate_user(username: str, password: str, session: Session):
+    user = get_user(session, username)
     if not user:
         return False
     if not utils.verify_password(password, user.password_hash):
@@ -66,7 +69,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials.",
@@ -80,7 +85,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         token_data = TokenData(username=username)
     except InvalidTokenError:
         raise credentials_exception
-    user = get_user(token_data.username)
+    user = get_user(session, token_data.username)
     if user is None:
         raise credentials_exception
     return user
