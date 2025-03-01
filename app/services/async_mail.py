@@ -6,6 +6,8 @@ from aiosmtplib import send
 from fastapi import FastAPI
 from premailer import transform
 
+from .. import utils
+
 app = FastAPI()
 
 # Email Configuration
@@ -32,6 +34,10 @@ async def send_email_async(email, subject, body, text="Hello"):
         username=SMTP_USER,
         password=SMTP_PASSWORD,
         start_tls=True,
+    )
+    utils.pretty_print(
+        "....",
+        f"Sent email to: {email}",
     )
 
 
