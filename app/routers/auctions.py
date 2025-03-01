@@ -4,11 +4,12 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import ValidationError
 from sqlmodel import Session
 
 from .. import db_handler as db
 from .. import utils
-from ..async_mail import send_email_async
+from ..config import HOST_URL, JINJA_AUCTION_EMAIL_TEMPLATE, JINJA_ENV
 from ..dependencies import AdminRequired, SessionDep, UserRequired
 from ..models.auction_model import (
     Auction,
@@ -21,7 +22,8 @@ from ..models.auction_model import (
     State,
 )
 from ..models.filter_model import AuctionFilter
-from ..models.user_model import User
+from ..models.user_model import User, UserPublic
+from ..services.async_mail import send_email_async
 
 router = APIRouter(prefix="/auctions")
 
@@ -193,11 +195,6 @@ async def update_auction(
     return AuctionPublic.model_validate(updated_auction)
 
 
-@router.delete(
-    "/{auction_id}",
-    dependencies=[UserRequired],
-    tags=["Auction CRUD"],
-)
 @router.delete("/{auction_id}", dependencies=[AdminRequired])
 async def delete_auction(
     auction_id: int, session: SessionDep
@@ -362,7 +359,7 @@ async def bid_on_auction(
         return {"bid": new_bid, "instant_buy": True}
 
     # check for highest bidder
-    highest_bidder = db_auction.get_highest_bidder()
+    highest_bidder = db_auction.get_highest_bid()
     live_auction = AuctionLive.model_validate(db_auction)
 
     # check for min bid
@@ -509,7 +506,7 @@ async def get_highest_bidder(
     """
 
     db_auction = db.read_object(Auction, session, auction_id)
-    highest_bidder = db_auction.get_highest_bidder()
+    highest_bidder = db_auction.get_highest_bid()
     if not highest_bidder:
         raise HTTPException(status_code=400, detail="No bids found")
     return highest_bidder
@@ -584,8 +581,7 @@ def process_finished_auctions(session: Session):
             order_by=AuctionFilter.END_TIME,
             reverse=True,
         )
-    except HTTPException as e:
-        utils.pretty_print("....", f"No live auctions: {e.detail}")
+    except HTTPException:
         return
 
     finished_auctions = []
@@ -594,7 +590,7 @@ def process_finished_auctions(session: Session):
         if not auction.end_time:
             utils.pretty_print(
                 "....",
-                "Auction with id {auction.id} has no end_time, resetting state back to setup",
+                f"Auction with id {auction.id} has no end_time, resetting state back to setup",
             )
             auction.state = State.setup
             continue
@@ -605,31 +601,28 @@ def process_finished_auctions(session: Session):
             finish_auction(auction, session)
             finished_auctions.append(auction.id)
 
-    utils.pretty_print(
-        "....",
-        f"Finished {len(finished_auctions)} auctions: {finished_auctions}",
-    )
+    if finished_auctions:
+        utils.pretty_print(
+            "....",
+            f"Finished {len(finished_auctions)} auctions: {finished_auctions}",
+        )
+
+    return finished_auctions
 
 
 def finish_auction(auction: Auction, session: Session) -> Auction:
-    highest_bid = auction.get_highest_bidder()
+    highest_bid = auction.get_highest_bid()
+    owner = UserPublic.model_validate(auction.owner)
+    try:
+        buyer = UserPublic.model_validate(auction.buyer)
+    except ValidationError:
+        buyer = None
 
     if highest_bid and highest_bid.amount > 0:
         auction.buyer_id = highest_bid.bidder_id
         auction.sold_price = highest_bid.amount
         auction.updated_at = utils.get_current_timestamp()
-
-        if isinstance(auction.products, list):
-            for product in auction.products:
-                product.sold = True
-                product.updated_at = utils.get_current_timestamp()
-        else:
-            auction.products.sold = True
-
-        auction_buyer = True  # to check if email should be sent to buyer
-
-    else:
-        auction_buyer = False  # no email will be sent to buyer
+        auction.product.sold = True
 
     auction.state = State.finished
 
@@ -637,30 +630,32 @@ def finish_auction(auction: Auction, session: Session) -> Auction:
     session.commit()
     session.refresh(auction)
 
-    # send mail to auction owner
-    email = auction.owner.email  # type: ignore
-    subject = "Auction finished!"
-    body = f"Auction with id {auction.id} has finished."
-    if auction.buyer:
-        body += f"Sold for {auction.sold_price} from {auction.buyer.username}."
+    # send emails
+    asyncio.run(send_auction_email(auction, owner))
 
-    asyncio.run(send_email_async(email, subject, body))
+    if buyer:
+        asyncio.run(send_auction_email(auction, buyer))
 
-    utils.pretty_print(
-        "....",
-        f"Sent email to owner: {auction.owner.email}",  # type: ignore
+    return auction
+
+
+async def send_auction_email(auction: Auction, receiver: UserPublic):
+    # Render email template
+    template = JINJA_ENV.get_template(JINJA_AUCTION_EMAIL_TEMPLATE)
+
+    auction_endpoint = f"auctions/?search_term={auction.id}&searched_column=id&order_by=id&reverse=false&offset=0&limit=1'"
+    CREATE_NEW_AUCTION_ENDPOINT = "Auction%20Live%20Cycle/create_auction_for_product_products__product_id__create_auction_post"
+
+    html_content = template.render(
+        auction=auction,
+        user=receiver,
+        product=auction.product,
+        auction_link=HOST_URL + auction_endpoint,
+        create_new_auction_link=HOST_URL + CREATE_NEW_AUCTION_ENDPOINT,
     )
 
-    # send mail to buyer / highest bidder
-    if auction_buyer:
-        email = auction.buyer.email  # type: ignore
-        subject = "Auction finished!"
-        body = f"Gratulation {auction.buyer.username}, you have won the auction with id {auction.id} with a price of {auction.sold_price}."  # type: ignore
+    email = receiver.email
+    subject = f"Auction with {auction.product.name} finished!"
+    body = html_content
 
-        asyncio.run(send_email_async(email, subject, body))
-
-        utils.pretty_print(
-            "....",
-            f"Sent email to buyer: {auction.buyer.email}",  # type: ignore
-        )
-    return auction
+    await send_email_async(email, subject, body)
