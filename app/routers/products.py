@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from .. import db_handler as db
 from .. import utils
-from ..dependencies import AdminRequired, SessionDep, UserRequired
+from ..dependencies import SessionDep, UserRequired
 from ..models.auction_model import (
     AuctionCreate,
     AuctionCreateFromProduct,
@@ -23,7 +23,7 @@ router = APIRouter(
 
 @router.post(
     "/",
-    dependencies=[AdminRequired],
+    dependencies=[UserRequired],
     tags=["Auction Live Cycle", "Product CRUD"],
 )
 async def create_product(
@@ -149,7 +149,7 @@ async def read_products(
 
 @router.patch(
     "/{product_id}",
-    dependencies=[AdminRequired],
+    dependencies=[UserRequired],
     tags=["Product CRUD"],
 )
 async def update_product(
@@ -184,7 +184,7 @@ async def update_product(
 
 @router.delete(
     "/{product_id}",
-    dependencies=[AdminRequired],
+    dependencies=[UserRequired],
     tags=["Product CRUD"],
 )
 async def delete_product(product_id: int, session: SessionDep):
