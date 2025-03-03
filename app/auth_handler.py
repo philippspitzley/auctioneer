@@ -8,8 +8,7 @@ from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from . import utils
-from . import db
+from . import db, utils
 from .config import ALGORITHM, SECRET_KEY
 from .models.user_model import User
 
@@ -25,7 +24,7 @@ class TokenData(BaseModel):
 
 SessionDep = Annotated[Session, Depends(db.get_session)]
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # Contrary to the fastapi documentation, I have removed passlib and used bcrypt directly,
 # as passlib issues an error message that is not supposed to be security-relevant,
