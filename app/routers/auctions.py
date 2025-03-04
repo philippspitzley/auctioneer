@@ -22,6 +22,7 @@ from ..models.auction_model import (
     State,
 )
 from ..models.filter_model import AuctionFilter
+from ..models.product_model import Product
 from ..models.user_model import User, UserPublic
 from ..services.async_mail import send_email_async
 
@@ -159,7 +160,7 @@ async def read_auction(auction_id: int, session: SessionDep) -> AuctionPublic:
 
 
 @router.patch(
-    "/{auction_id}/update",
+    "/{auction_id}",
     dependencies=[AdminRequired],
     tags=["Auction CRUD"],
 )
@@ -195,7 +196,11 @@ async def update_auction(
     return AuctionPublic.model_validate(updated_auction)
 
 
-@router.delete("/{auction_id}", dependencies=[AdminRequired])
+@router.delete(
+    "/{auction_id}",
+    dependencies=[UserRequired],
+    tags=["Auction CRUD"],
+)
 async def delete_auction(
     auction_id: int, session: SessionDep
 ) -> dict[str, bool]:
@@ -542,6 +547,116 @@ def get_finished_auctions(session: SessionDep) -> list[AuctionPublic]:
         reverse=True,
     )
     return [AuctionPublic.model_validate(auction) for auction in auctions]
+
+
+###############################################################################
+################################ Linked Objects ###############################
+###############################################################################
+
+
+@router.get(
+    "/{auction_id}/product",
+    dependencies=[UserRequired],
+    tags=["Auction Relations"],
+)
+async def read_auction_product(
+    auction_id: int, session: SessionDep
+) -> Product:
+    """
+    ## Retrieve the product for a specific auction
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `auction_id`: `int` The ID of the auction to retrieve the product for.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `Product`: The product representation associated with the given auction ID.
+
+    ### Raises
+
+    * `HTTPException`: If the auction or product is not found.
+    """
+    auction = db.read_object(Auction, session, auction_id)
+    product = auction.product
+    if product is None:
+        raise HTTPException(status_code=400, detail="No product found")
+    return Product.model_validate(product)
+
+
+@router.get(
+    "/{auction_id}/owner",
+    dependencies=[UserRequired],
+    tags=["Auction Relations"],
+)
+async def read_auction_owner(
+    auction_id: int, session: SessionDep
+) -> UserPublic:
+    """
+    ## Retrieve the owner for a specific auction
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `auction_id`: `int` The ID of the auction to retrieve the product for.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `UserPublic`: The public user representation associated with the given auction ID.
+
+    ### Raises
+
+    * `HTTPException`: If the auction or owner is not found.
+    """
+    auction = db.read_object(Auction, session, auction_id)
+    owner = auction.owner
+    if owner is None:
+        raise HTTPException(status_code=400, detail="No owner found")
+    return UserPublic.model_validate(owner)
+
+
+@router.get(
+    "/{auction_id}/buyer",
+    dependencies=[UserRequired],
+    tags=["Auction Relations"],
+)
+async def read_auction_buyer(
+    auction_id: int, session: SessionDep
+) -> UserPublic:
+    """
+    ## Retrieve the owner for a specific auction
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `auction_id`: `int` The ID of the auction to retrieve the product for.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `UserPublic`: The public user representation associated with the given auction ID.
+
+    ### Raises
+
+    * `HTTPException`: If the auction or owner is not found.
+    """
+    auction = db.read_object(Auction, session, auction_id)
+    buyer = auction.buyer
+    if buyer is None:
+        raise HTTPException(status_code=400, detail="No buyer found")
+    return UserPublic.model_validate(buyer)
 
 
 ################################################################################
