@@ -22,7 +22,6 @@ from ..models.user_model import (
 
 router = APIRouter(
     prefix="/users",
-    tags=["User"],
 )
 
 
