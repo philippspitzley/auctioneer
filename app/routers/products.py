@@ -17,7 +17,6 @@ from .auctions import create_auction
 
 router = APIRouter(
     prefix="/products",
-    tags=["Products"],
 )
 
 
@@ -270,11 +269,15 @@ async def create_auction_for_product(
 
 
 ###############################################################################
-########################### Other Product Endpoints ###########################
+################################ Linked Objects ###############################
 ###############################################################################
 
 
-@router.get("/{product_id}/auction", dependencies=[UserRequired])
+@router.get(
+    "/{product_id}/auction",
+    dependencies=[UserRequired],
+    tags=["Product Relations"],
+)
 async def read_product_auction(
     product_id: int, session: SessionDep
 ) -> AuctionPublic:
@@ -300,10 +303,16 @@ async def read_product_auction(
     """
     product = db.read_object(Product, session, product_id)
     auction = product.auction
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
     return AuctionPublic.model_validate(auction)
 
 
-@router.get("/{product_id}/owner", dependencies=[UserRequired])
+@router.get(
+    "/{product_id}/owner",
+    dependencies=[UserRequired],
+    tags=["Product Relations"],
+)
 async def read_product_owner(
     product_id: int, session: SessionDep
 ) -> UserPublic:
@@ -329,10 +338,49 @@ async def read_product_owner(
     """
 
     product = db.read_object(Product, session, product_id)
-    return UserPublic.model_validate(product.owner)
+    owner = product.owner
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+    return UserPublic.model_validate(owner)
 
 
-@router.post("/{product_id}/add_category", dependencies=[UserRequired])
+@router.get(
+    "/{product_id}/categories",
+    dependencies=[UserRequired],
+    tags=["Product Relations"],
+)
+async def read_product_categories(
+    product_id: int, session: SessionDep
+) -> list[Category]:
+    """
+    ## Retrieve categories for a specific product
+
+    _Requires user authentication._
+
+    ### Parameters
+
+    * `product_id`: `int` The ID of the product to retrieve categories for.
+
+    * `session`: `SessionDep` The database session used for querying.
+        * __Not needed for api calls__.
+
+    ### Returns
+
+    * `list[Category]`: A list of categories associated with the given product ID.
+
+    ### Raises
+
+    * `HTTPException`: If the product is not found.
+    """
+    product = db.read_object(Product, session, product_id)
+    return product.categories
+
+
+@router.post(
+    "/{product_id}/add_category",
+    dependencies=[UserRequired],
+    tags=["Product Relations"],
+)
 async def add_product_category(
     product_id: int, category: Category, session: SessionDep
 ) -> Product:
@@ -364,31 +412,3 @@ async def add_product_category(
     session.commit()
     session.refresh(product)
     return product
-
-
-@router.get("/{product_id}/categories", dependencies=[UserRequired])
-async def read_product_categories(
-    product_id: int, session: SessionDep
-) -> list[Category]:
-    """
-    ## Retrieve categories for a specific product
-
-    _Requires user authentication._
-
-    ### Parameters
-
-    * `product_id`: `int` The ID of the product to retrieve categories for.
-
-    * `session`: `SessionDep` The database session used for querying.
-        * __Not needed for api calls__.
-
-    ### Returns
-
-    * `list[Category]`: A list of categories associated with the given product ID.
-
-    ### Raises
-
-    * `HTTPException`: If the product is not found.
-    """
-    product = db.read_object(Product, session, product_id)
-    return product.categories
