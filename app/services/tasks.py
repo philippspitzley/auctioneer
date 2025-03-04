@@ -2,9 +2,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlmodel import Session
 
-from .. import db
-
-from .. import utils
+from .. import db, utils
 from ..routers.auctions import process_finished_auctions
 
 
@@ -17,5 +15,5 @@ def process_finished_auctions_with_session():
 
 # Set up the scheduler
 scheduler = BackgroundScheduler()
-trigger = IntervalTrigger(minutes=15)
+trigger = IntervalTrigger(minutes=1)
 scheduler.add_job(process_finished_auctions_with_session, trigger)
