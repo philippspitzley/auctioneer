@@ -358,6 +358,7 @@ async def bid_on_auction(
         )
         new_bid.amount = db_auction.instant_buy_price
         db_auction.instant_buy = True
+        db_auction.product.sold = True
         db_auction.end_time = new_bid.created_at
         session.commit()
         session.refresh(new_bid)
